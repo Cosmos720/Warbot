@@ -123,6 +123,14 @@ class RedBase extends Base implements RedRobot {
           // gives the requested amount of bullets only if at least 1000 units of energy left after
           giveBullets(msg.alice, msg.args[0]);
         }
+      } else if (msg.type == INFORM_ABOUT_TARGET) {
+        PVector p = new PVector();
+        p.x = msg.args[0];
+        p.y = msg.args[1];
+        if (distance(p)<distance(brain[6])) {
+          brain[6].x = p.x;
+          brain[6].y = p.y;
+        }
       }
     }
     // clear the message queue
@@ -296,15 +304,38 @@ class RedExplorer extends Explorer implements RedRobot {
     Base babe = (Base)oneOf(perceiveRobots(ennemy, BASE));
     if (babe != null) {
       // if one is seen, look for a friend explorer
-      Explorer explo = (Explorer)oneOf(perceiveRobots(friend, EXPLORER));
+      PVector p = new PVector();
+      p.x = babe.pos.x;
+      p.y = babe.pos.y;
+      informAboutBase(p);
+    }
+  }
+
+  void informAboutBase(PVector babe) {
+    Explorer explo = (Explorer)oneOf(perceiveRobots(friend, EXPLORER));
       if (explo != null)
         // if one is seen, send a message with the localized ennemy base
-        informAboutTarget(explo, babe);
+        informAboutXYTarget(explo, babe);
       // look for a friend base
       Base basy = (Base)oneOf(perceiveRobots(friend, BASE));
       if (basy != null)
         // if one is seen, send a message with the localized ennemy base
-        informAboutTarget(basy, babe);
+        informAboutXYTarget(basy, babe);
+  }
+
+  void handleMessages() {
+    Message msg;
+    // for all messages
+    for (int i=0; i<messages.size(); i++) {
+      // get next message
+      msg = messages.get(i);
+      // if "localized target" message
+      if (msg.type == INFORM_ABOUT_TARGET && msg.args[2] == BASE) {
+        PVector p = new PVector();
+        p.x = msg.args[0];
+        p.y = msg.args[1];
+        informAboutBase(p);
+      }
     }
   }
 
@@ -573,6 +604,10 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       // if in "go back to base" mode
       goBackToBase();
     } else {
+      if (target() && distance(brain[0])>detectionRange){
+        heading = towards(brain[0]);
+        tryToMoveForward();
+      }
       // try to find a target
       selectTarget();
       // if target identified
