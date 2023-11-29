@@ -563,6 +563,7 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
   // > defines the behavior of the agent
   //
   void go() {
+    handleMessages();
     // if no energy or no bullets
     if ((energy < 100) || (bullets == 0))
       // go back to the base
