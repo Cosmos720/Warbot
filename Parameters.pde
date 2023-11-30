@@ -29,7 +29,8 @@ int nbPatchesX = 120;
 int nbPatchesY = 60;
 
 // the maximum number of iterations for a game
-int maxTicks = 25000;
+//int maxTicks = 25000;
+int maxTicks = 10000;
 boolean tournamentMode = false;
 
 // specifies what has to be displayed

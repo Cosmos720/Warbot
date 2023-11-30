@@ -123,13 +123,13 @@ class RedBase extends Base implements RedRobot {
           // gives the requested amount of bullets only if at least 1000 units of energy left after
           giveBullets(msg.alice, msg.args[0]);
         }
-      } else if (msg.type == INFORM_ABOUT_TARGET) {
+      } else if (msg.type == INFORM_ABOUT_XYTARGET) {
         PVector p = new PVector();
         p.x = msg.args[0];
         p.y = msg.args[1];
-        if (distance(p)<distance(brain[6])) {
-          brain[6].x = p.x;
-          brain[6].y = p.y;
+        if (distance(p)<distance(brain[1]) || brain[1].z==0) {
+          brain[1] = p;
+          brain[1].z = 1;
         }
       }
     }
@@ -194,6 +194,9 @@ class RedExplorer extends Explorer implements RedRobot {
     // inform rocket launchers about targets
     driveRocketLaunchers();
 
+    if (brain[1].z != 0){
+      informAboutBase(brain[1]);
+    }
     // clear the message queue
     flushMessages();
   }
@@ -308,6 +311,9 @@ class RedExplorer extends Explorer implements RedRobot {
       p.x = babe.pos.x;
       p.y = babe.pos.y;
       informAboutBase(p);
+      brain[1] = p;
+      //enemy base found
+      brain[1].z = 1;
     }
   }
 
@@ -330,11 +336,14 @@ class RedExplorer extends Explorer implements RedRobot {
       // get next message
       msg = messages.get(i);
       // if "localized target" message
-      if (msg.type == INFORM_ABOUT_TARGET && msg.args[2] == BASE) {
+      if (msg.type == INFORM_ABOUT_XYTARGET) {
         PVector p = new PVector();
         p.x = msg.args[0];
         p.y = msg.args[1];
         informAboutBase(p);
+        brain[1] = p;
+        //enemy base found
+        brain[1].z = 1;
       }
     }
   }
@@ -604,19 +613,24 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       // if in "go back to base" mode
       goBackToBase();
     } else {
-      if (target() && distance(brain[0])>detectionRange){
+      if (target() && distance(brain[0])>detectionRange-2){
         heading = towards(brain[0]);
         tryToMoveForward();
       }
       // try to find a target
       selectTarget();
       // if target identified
-      if (target())
+      if (target()){
+        if (distance(brain[0])>detectionRange-2){
+          heading = towards(brain[0]);
+          tryToMoveForward();
+        }
         // shoot on the target
         launchBullet(towards(brain[0]));
-      else
+      } else {
         // else explore randomly
         randomMove(45);
+      }
     }
   }
 
