@@ -28,6 +28,13 @@ interface RedRobot {
 // The code for the green bases
 //
 ///////////////////////////////////////////////////////////////////////////
+// map of the brain:
+//   5.x : Number of harvester to create
+//   5.y : Number of rocket launcher to create
+//   5.z : Number of explorer to create
+//   1.x / 1.y : Coordinate of nearest enemy base
+//   1.z = (0: no enemy base found / 1: enemy base found)
+///////////////////////////////////////////////////////////////////////////
 class RedBase extends Base implements RedRobot {
   //
   // constructor
@@ -98,6 +105,13 @@ class RedBase extends Base implements RedRobot {
       // launch a faf if no friend robot on the trajectory...
       if (perceiveRobotsInCone(friend, heading) == null)
         launchFaf(bob);
+    }
+    // if enemy base known, inform friend rocket launcher about the coordinate of the nearest enemy base
+    if (brain[1].z == 1){
+      RocketLauncher rocket = (RocketLauncher)oneOf(perceiveRobots(friend, LAUNCHER));
+      if (rocket != null){
+        informAboutXYTarget(brain[1], rocket);
+      }
     }
   }
 
@@ -576,6 +590,8 @@ class RedHarvester extends Harvester implements RedRobot {
 // map of the brain:
 //   0.x / 0.y = position of the target
 //   0.z = breed of the target
+//   1.x / 1.y = position of the enemy base target
+//   1.z = (0 = no enemy base targeted | 1 = enemy base targeted)
 //   4.x = (0 = look for target | 1 = go back to base) 
 //   4.y = (0 = no target | 1 = localized target)
 ///////////////////////////////////////////////////////////////////////////
@@ -613,18 +629,14 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       // if in "go back to base" mode
       goBackToBase();
     } else {
-      if (target() && distance(brain[0])>detectionRange-2){
-        heading = towards(brain[0]);
-        tryToMoveForward();
+      if(brain[1].z == 1){
+        
       }
-      // try to find a target
-      selectTarget();
-      // if target identified
-      if (target()){
-        if (distance(brain[0])>detectionRange-2){
-          heading = towards(brain[0]);
-          tryToMoveForward();
-        }
+      if(!target()){
+        // try to find a target
+        selectTarget();
+      }else{
+        goToTarget(brain[0])
         // shoot on the target
         launchBullet(towards(brain[0]));
       } else {
@@ -632,6 +644,13 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         randomMove(45);
       }
     }
+  }
+
+  void goToTarget(PVector t){
+    if (distance(t)>detectionRange-2){
+          heading = towards(t);
+          tryToMoveForward();
+        }
   }
 
   //
@@ -727,6 +746,11 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
           // update the corresponding flag
           brain[4].y = 1;
         }
+      }
+      if (msg.type == INFORM_ABOUT_XYTARGET){
+        brain[1].x = msg.args[0]
+        brain[1].y = msg.args[1]
+        brain[1].z = 1
       }
     }
     // clear the message queue
