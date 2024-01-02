@@ -5,8 +5,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+final int INFORM_ABOUT_DESTROYED_BASE = 5;
 class RedTeam extends Team {
-  final int MY_CUSTOM_MSG = 5;
   
   PVector base1, base2;
 
@@ -54,6 +54,7 @@ class RedBase extends Base implements RedRobot {
     newHarvester();
     // 7 more harvesters to create
     brain[5].x = 7;
+    brain[5].z = 1;
   }
 
   //
@@ -81,6 +82,18 @@ class RedBase extends Base implements RedRobot {
         brain[5].z--;
     } else if (energy > 12000) {
       // if no robot in the pipe and enough energy 
+      switch((int)random(3)){
+        case 0:
+          brain[5].x++;
+          break;
+        case 1:
+          brain[5].y++;
+          break;
+        case 2:
+          brain[5].z++;
+          break;
+      }
+      /*
       if ((int)random(2) == 0)
         // creates a new harvester with 50% chance
         brain[5].x++;
@@ -90,6 +103,7 @@ class RedBase extends Base implements RedRobot {
       else
         // creates a new explorer with 25% chance
         brain[5].z++;
+      */
     }
 
     // creates new bullets and fafs if the stock is low and enought energy
@@ -107,11 +121,18 @@ class RedBase extends Base implements RedRobot {
         launchFaf(bob);
     }
     // if enemy base known, inform friend rocket launcher about the coordinate of the nearest enemy base
-    if (brain[1].z == 1){
+    if (brain[4].z == 1){
       RocketLauncher rocket = (RocketLauncher)oneOf(perceiveRobots(friend, LAUNCHER));
       if (rocket != null){
         informAboutXYTarget(rocket, brain[1]);
       }
+    }
+  }
+
+  void forgetEnnemyBase() {
+    if(brain[4].z == 1 && brain[1].z+5000 <= game.ticks){
+      brain[1]=new PVector();
+      brain[4].z = 0;
     }
   }
 
@@ -141,9 +162,18 @@ class RedBase extends Base implements RedRobot {
         PVector p = new PVector();
         p.x = msg.args[0];
         p.y = msg.args[1];
-        if (distance(p)<distance(brain[1]) || brain[1].z==0) {
+        if (distance(p)<distance(brain[1]) || brain[4].z==0) {
           brain[1] = p;
-          brain[1].z = 1;
+          brain[1].z = game.ticks;
+          brain[4].z = 1;
+        }
+      } else if (msg.type == INFORM_ABOUT_DESTROYED_BASE) {
+        PVector p = new PVector();
+        p.x = msg.args[0];
+        p.y = msg.args[1];
+        if (brain[1].x == p.x && brain[1].y == p.y){
+          brain[1] = new PVector();
+          brain[4].z = 0;
         }
       }
     }
@@ -162,6 +192,8 @@ class RedBase extends Base implements RedRobot {
 //   4.y = (0 = no target | 1 = locked target)
 //   0.x / 0.y = coordinates of the target
 //   0.z = type of the target
+//   1.x / 1.y = position of the enemy base target
+//   1.z = tick de l'enregistrement
 ///////////////////////////////////////////////////////////////////////////
 class RedExplorer extends Explorer implements RedRobot {
   //
@@ -207,8 +239,10 @@ class RedExplorer extends Explorer implements RedRobot {
     driveHarvesters();
     // inform rocket launchers about targets
     driveRocketLaunchers();
+    // forget ennemy base after 150 ticks
+    forgetEnnemyBase();
 
-    if (brain[1].z != 0){
+    if (brain[4].z == 1){
       informAboutBase(brain[1]);
     }
     // clear the message queue
@@ -320,14 +354,20 @@ class RedExplorer extends Explorer implements RedRobot {
     // look for an ennemy base
     Base babe = (Base)oneOf(perceiveRobots(ennemy, BASE));
     if (babe != null) {
-      // if one is seen, look for a friend explorer
       PVector p = new PVector();
       p.x = babe.pos.x;
       p.y = babe.pos.y;
-      informAboutBase(p);
+      p.z = game.ticks;
       brain[1] = p;
       //enemy base found
-      brain[1].z = 1;
+      brain[4].z = 1;
+    }
+  }
+
+  void forgetEnnemyBase() {
+    if(brain[4].z == 1 && brain[1].z+1000 <= game.ticks){
+      brain[1]=new PVector();
+      brain[4].z = 0;
     }
   }
 
@@ -337,10 +377,12 @@ class RedExplorer extends Explorer implements RedRobot {
         // if one is seen, send a message with the localized ennemy base
         informAboutXYTarget(explo, babe);
       // look for a friend base
-      Base basy = (Base)oneOf(perceiveRobots(friend, BASE));
-      if (basy != null)
+    Base basy = (Base)oneOf(perceiveRobots(friend, BASE));
+      if (basy != null){
         // if one is seen, send a message with the localized ennemy base
         informAboutXYTarget(basy, babe);
+        brain[1] = new PVector();
+      }
   }
 
   void handleMessages() {
@@ -354,10 +396,17 @@ class RedExplorer extends Explorer implements RedRobot {
         PVector p = new PVector();
         p.x = msg.args[0];
         p.y = msg.args[1];
-        informAboutBase(p);
         brain[1] = p;
+        brain[1].z = game.ticks;
         //enemy base found
-        brain[1].z = 1;
+        brain[4].z = 1;
+      } else if (msg.type == INFORM_ABOUT_DESTROYED_BASE) {
+        PVector p = new PVector();
+        p.x = msg.args[0];
+        p.y = msg.args[1];
+        if (brain[1].x == p.x && brain[1].y == p.y){
+          brain[1] = new PVector();
+        }
       }
     }
   }
@@ -594,6 +643,7 @@ class RedHarvester extends Harvester implements RedRobot {
 //   1.z = (0 = no enemy base targeted | 1 = enemy base targeted)
 //   4.x = (0 = look for target | 1 = go back to base) 
 //   4.y = (0 = no target | 1 = localized target)
+//   4.z = (0 = look for ennemy base | 1 = ennemy base destroyed)
 ///////////////////////////////////////////////////////////////////////////
 class RedRocketLauncher extends RocketLauncher implements RedRobot {
   //
@@ -630,30 +680,56 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       goBackToBase();
     } else {
       if(brain[1].z == 1){
-        
-      }
-      if(!target()){
-        // try to find a target
-        selectTarget();
-      } else {
-        if(goToTarget(brain[0])){
+        if(goToTarget(brain[1])){
           // shoot on the target
-          launchBullet(towards(brain[0]));
+          Base b = (Base)oneOf(perceiveRobots(ennemy, BASE));
+          if(b != null){
+            launchBullet(towards(b));
+          } else {
+            brain[1].z = 0;
+            brain[4].z = 1;
+            brain[4].x = 1;
+          }
+        }
+      } else {
+        if(!target()){
+          // try to find a target
+          selectTarget();
+        }
+        if (target() && goToTarget(brain[0])){
+          // shoot on the target
+          Robot bob = (Robot)minDist(perceiveRobots(ennemy));
+          if(bob != null){
+            launchBullet(towards(bob));
+          } else {
+            brain[4].y = 0;
+          }
         } else {
-          // else explore randomly
           randomMove(45);
+        }
+      }
+    }
+    if (brain[4].z == 1){
+      ArrayList<Robot> bob = (ArrayList<Robot>)perceiveRobots(friend);
+      if (bob!=null){
+        for(Robot r : bob){
+          PVector p = new PVector();
+          p.x = brain[1].x;
+          p.y = brain[1].y;
+          p.z = 1;
+          informAboutDestroyedBase(r, p);
         }
       }
     }
   }
 
   boolean goToTarget(PVector t){
-    if (distance(t)>detectionRange-2){
+    if (distance(t)>detectionRange-3){
       heading = towards(t);
       tryToMoveForward();
-      return true;
+      return false;
     }
-    return false;
+    return true;
   }
 
   //
@@ -716,6 +792,29 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         // ...and try to move forward
         tryToMoveForward();
       }
+    }
+  }
+
+  //
+  // informAboutDestroyedBase
+  // ===================
+  // > sends a INFORM_ABOUT_DESTROYED_BASE message to another robot
+  //
+  // input
+  // -----
+  // > bob = the id (who) of the receiver
+  // > p = the position of the target
+  //
+  void informAboutDestroyedBase(Robot bob, PVector p) {
+    // if bob exists and distance less than max range
+    if ((bob != null) && (distance(bob) < messageRange)) {
+      // build the message...
+      float[] args = new float[2];
+      args[0] = p.x;
+      args[1] = p.y;
+      Message msg = new Message(INFORM_ABOUT_DESTROYED_BASE, who, bob.who, args);
+      // ...and add it to bob's messages queue
+      bob. messages.add(msg);
     }
   }
   
