@@ -110,7 +110,7 @@ class RedBase extends Base implements RedRobot {
     if (brain[1].z == 1){
       RocketLauncher rocket = (RocketLauncher)oneOf(perceiveRobots(friend, LAUNCHER));
       if (rocket != null){
-        informAboutXYTarget(brain[1], rocket);
+        informAboutXYTarget(rocket, brain[1]);
       }
     }
   }
@@ -635,22 +635,25 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       if(!target()){
         // try to find a target
         selectTarget();
-      }else{
-        goToTarget(brain[0])
-        // shoot on the target
-        launchBullet(towards(brain[0]));
       } else {
-        // else explore randomly
-        randomMove(45);
+        if(goToTarget(brain[0])){
+          // shoot on the target
+          launchBullet(towards(brain[0]));
+        } else {
+          // else explore randomly
+          randomMove(45);
+        }
       }
     }
   }
 
-  void goToTarget(PVector t){
+  boolean goToTarget(PVector t){
     if (distance(t)>detectionRange-2){
-          heading = towards(t);
-          tryToMoveForward();
-        }
+      heading = towards(t);
+      tryToMoveForward();
+      return true;
+    }
+    return false;
   }
 
   //
@@ -748,9 +751,9 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         }
       }
       if (msg.type == INFORM_ABOUT_XYTARGET){
-        brain[1].x = msg.args[0]
-        brain[1].y = msg.args[1]
-        brain[1].z = 1
+        brain[1].x = msg.args[0];
+        brain[1].y = msg.args[1];
+        brain[1].z = 1;
       }
     }
     // clear the message queue
