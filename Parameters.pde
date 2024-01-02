@@ -36,6 +36,7 @@ boolean tournamentMode = false;
 // specifies what has to be displayed
 int display = 0;
 boolean displayPatches = false;
+boolean pause = false;
 boolean displayRange = true;
 final int ENERGY = 0;
 final int C_FOOD = 1;

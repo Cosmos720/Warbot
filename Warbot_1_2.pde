@@ -59,12 +59,12 @@ void setup() {
 //
 ///////////////////////////////////////////////////////////////////////////
 void draw() {
-  if (!tournamentMode) {
+  if (!tournamentMode && !pause) {
     // activates every agent of the game
     game.go();
     // updates the display
     game.display();
-    // makes the clock advance 
+    // makes the clock advance
     game.tick();
   }
 }
@@ -130,6 +130,10 @@ void keyTyped() {
   case 'r':
     // to display (or not) the range of perception
     displayRange = !displayRange;
+    break;
+  case 't':
+    // to pause the simulation
+    pause = !pause;
     break;
   }
 }
