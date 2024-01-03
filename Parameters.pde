@@ -32,6 +32,7 @@ int nbPatchesY = 60;
 //int maxTicks = 25000;
 int maxTicks = 10000;
 boolean tournamentMode = false;
+//boolean tournamentMode = true;
 
 // specifies what has to be displayed
 int display = 0;

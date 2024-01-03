@@ -5,7 +5,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-final int INFORM_ABOUT_DESTROYED_BASE = 5;
 class RedTeam extends Team {
   
   PVector base1, base2;
@@ -21,6 +20,7 @@ class RedTeam extends Team {
 }
 
 interface RedRobot {
+  final int INFORM_ABOUT_DESTROYED_BASE = 5;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ interface RedRobot {
 //   5.y : Number of rocket launcher to create
 //   5.z : Number of explorer to create
 //   1.x / 1.y : Coordinate of nearest enemy base
-//   1.z = (0: no enemy base found / 1: enemy base found)
+//   1.z = tick de l'enregistrement
 ///////////////////////////////////////////////////////////////////////////
 class RedBase extends Base implements RedRobot {
   //
@@ -109,11 +109,11 @@ class RedBase extends Base implements RedRobot {
     // creates new bullets and fafs if the stock is low and enought energy
     if ((bullets < 10) && (energy > 1000))
       newBullets(50);
-    if ((bullets < 10) && (energy > 1000))
+    if ((fafs < 10) && (energy > 1000))
       newFafs(10);
 
     // if ennemy rocket launcher in the area of perception
-    Robot bob = (Robot)minDist(perceiveRobots(ennemy, LAUNCHER));
+    Robot bob = (Robot)minDist(perceiveRobots(ennemy));
     if (bob != null) {
       heading = towards(bob);
       // launch a faf if no friend robot on the trajectory...
@@ -190,6 +190,7 @@ class RedBase extends Base implements RedRobot {
 // map of the brain:
 //   4.x = (0 = exploration | 1 = go back to base)
 //   4.y = (0 = no target | 1 = locked target)
+//   4.z = (0 = no ennemy base | 1 = ennemy base found)
 //   0.x / 0.y = coordinates of the target
 //   0.z = type of the target
 //   1.x / 1.y = position of the enemy base target
@@ -219,6 +220,7 @@ class RedExplorer extends Explorer implements RedRobot {
   // > defines the behavior of the agent
   //
   void go() {
+    handleMessages();
     // if food to deposit or too few energy
     if ((carryingFood > 200) || (energy < 100))
       // time to go back to base
@@ -364,6 +366,11 @@ class RedExplorer extends Explorer implements RedRobot {
     }
   }
 
+  //
+  // forgetEnnemyBase
+  // =================
+  // > Forget ennemy base after a certain amount of time
+  //
   void forgetEnnemyBase() {
     if(brain[4].z == 1 && brain[1].z+1000 <= game.ticks){
       brain[1]=new PVector();
@@ -716,7 +723,6 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
           PVector p = new PVector();
           p.x = brain[1].x;
           p.y = brain[1].y;
-          p.z = 1;
           informAboutDestroyedBase(r, p);
         }
       }
