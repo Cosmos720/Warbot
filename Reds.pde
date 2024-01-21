@@ -12,15 +12,20 @@ class RedTeam extends Team {
   // coordinates of the 2 bases, chosen in the rectangle with corners
   // (width/2, 0) and (width, height-100)
   RedTeam() {
+    int halfWidth = width/2;
+    int halfHeight = (height - 100) / 2;
+
     // first base
-    base1 = new PVector(width/2 + 300, (height - 100)/2 - 150);
+    base1 = new PVector(halfWidth + (int)random(2*(halfWidth/10), 8*(halfWidth/10)), halfHeight - (int)random(2*(halfHeight/10), 8*(halfHeight/10)));
     // second base
-    base2 = new PVector(width/2 + 300, (height - 100)/2 + 150);
+    base2 = new PVector(halfWidth + (int)random(2*(halfWidth/10), 8*(halfWidth/10)), halfHeight + (int)random(2*(halfHeight/10), 8*(halfHeight/10)));
   }  
 }
 
 interface RedRobot {
   final int INFORM_ABOUT_DESTROYED_BASE = 5;
+  final int BECOME_DALEKS = 6;
+  final int GO_HOME = 7;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -222,33 +227,88 @@ class RedExplorer extends Explorer implements RedRobot {
   void go() {
     handleMessages();
     // if food to deposit or too few energy
-    if ((carryingFood > 200) || (energy < 100))
-      // time to go back to base
-      brain[4].x = 1;
+    if (brain[2].z == 0){
+      if ((carryingFood > 200) || (energy < 100))
+        // time to go back to base
+        brain[4].x = 1;
 
-    // depending on the state of the robot
-    if (brain[4].x == 1) {
-      // go back to base...
-      goBackToBase();
-    } else {
-      // ...or explore randomly
-      randomMove(45);
-    }
+      // depending on the state of the robot
+      if (brain[4].x == 1) {
+        // go back to base...
+        goBackToBase();
+      } else {
+        // ...or explore randomly
+        randomMove(45);
+      }
 
-    // tries to localize ennemy bases
-    lookForEnnemyBase();
-    // inform harvesters about food sources
-    driveHarvesters();
-    // inform rocket launchers about targets
-    driveRocketLaunchers();
-    // forget ennemy base after 150 ticks
-    forgetEnnemyBase();
+      // tries to localize ennemy bases
+      lookForEnnemyBase();
+      // inform harvesters about food sources
+      driveHarvesters();
+      // inform rocket launchers about targets
+      driveRocketLaunchers();
+      // forget ennemy base after 150 ticks
+      forgetEnnemyBase();
 
-    if (brain[4].z == 1){
-      informAboutBase(brain[1]);
+      if (brain[4].z == 1){
+        informAboutBase(brain[1]);
+      }
+    } else { //Dalek behavior
+      Robot dalek = folowingOf(perceiveRobots(friend, LAUNCHER));
+      if (dalek != null){
+        if ((carryingFood > 200) || (energy < 100)){
+          Base home = (Base)oneOf(perceiveRobots(friend, BASE));
+          if (home != null){
+            askForEnergy(home, 1500 - energy);
+          } else {
+            goHome(dalek);
+          }
+        }
+        if (distance(dalek) >= 3){
+          heading = towards(dalek);
+          tryToMoveForward();
+        }
+        driveRocketLaunchers();
+      }
     }
     // clear the message queue
     flushMessages();
+  }
+
+  //
+  // goHome
+  // ===================
+  // > sends a GO_HOME message to another robot
+  //
+  // input
+  // -----
+  // > bob = the id (who) of the receiver
+  // > p = the position of the target
+  //
+  void goHome(Robot bob) {
+    // if bob exists and distance less than max range
+    if ((bob != null) && (distance(bob) < messageRange)) {
+      // build the message...
+      float[] args = new float[1];
+      args[0] = who;
+      Message msg = new Message(GO_HOME, who, bob.who, args);
+      // ...and add it to bob's messages queue
+      bob.messages.add(msg);
+    }
+  }
+
+Robot folowingOf(ArrayList<Robot> agentSet) {
+    // check that the list is not null and not of length 0
+    if ((agentSet != null) && (agentSet.size() != 0)) {
+      for(Robot robot : agentSet){
+        if (robot.who == brain[2].z){
+          // return the following agent
+          return robot;
+        }
+      }
+    }
+    // else return null
+    return null;
   }
 
   //
@@ -336,10 +396,10 @@ class RedExplorer extends Explorer implements RedRobot {
   //
   void driveRocketLaunchers() {
     // look for an ennemy robot 
-    Robot bob = (Robot)oneOf(perceiveRobots(ennemy));
+    Robot bob = (brain[2].z == 0) ? (Robot)oneOf(perceiveRobots(ennemy)) : (Robot)oneOf(perceiveRobots(ennemy, HARVESTER));
     if (bob != null) {
       // if one is seen, look for a friend rocket launcher
-      RocketLauncher rocky = (RocketLauncher)oneOf(perceiveRobots(friend, LAUNCHER));
+      RocketLauncher rocky = (brain[2].z == 0) ? (RocketLauncher)oneOf(perceiveRobots(friend, LAUNCHER)) : (RocketLauncher)folowingOf(perceiveRobots(friend, LAUNCHER));
       if (rocky != null)
         // if a rocket launcher is seen, send a message with the localized ennemy robot
         informAboutTarget(rocky, bob);
@@ -378,6 +438,31 @@ class RedExplorer extends Explorer implements RedRobot {
     }
   }
 
+  //
+  // becomeDaleks
+  // ===================
+  // > sends a BECOME_DALEKS message to another robot
+  //
+  // input
+  // -----
+  // > bob = the id (who) of the receiver
+  // > p = the position of the target
+  //
+  void becomeDaleks(int id) {
+    Robot bob = game.getRobot(id);
+    // if bob exists and distance less than max range
+    if ((bob != null) && (distance(bob) < messageRange)) {
+      // build the message...
+      float[] args = new float[1];
+      args[0] = who;
+      Message msg = new Message(BECOME_DALEKS, who, bob.who, args);
+      // ...and add it to bob's messages queue
+      bob.messages.add(msg);
+    }
+  }
+
+
+
   void informAboutBase(PVector babe) {
     Explorer explo = (Explorer)oneOf(perceiveRobots(friend, EXPLORER));
       if (explo != null)
@@ -414,6 +499,9 @@ class RedExplorer extends Explorer implements RedRobot {
         if (brain[1].x == p.x && brain[1].y == p.y){
           brain[1] = new PVector();
         }
+      } else if (msg.type == BECOME_DALEKS && brain[2].z == 0) {
+        brain[2].z = msg.args[0];
+        becomeDaleks(msg.alice);
       }
     }
   }
@@ -682,11 +770,19 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
       // go back to the base
       brain[4].x = 1;
 
+    if (brain[2].z != 0){
+      Explorer explorer = (Explorer)folowingOf(perceiveRobots(friend, EXPLORER));
+      if (explorer == null){
+        println("My Explorer" + brain[2].z + "is DEAD");
+        brain[2].z = 0;
+      }
+    }
+
     if (brain[4].x == 1) {
       // if in "go back to base" mode
       goBackToBase();
     } else {
-      if(brain[1].z == 1){
+      if(brain[1].z == 1 && brain[2].z == 0){
         if(goToTarget(brain[1])){
           // shoot on the target
           Base b = (Base)oneOf(perceiveRobots(ennemy, BASE));
@@ -699,13 +795,23 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
           }
         }
       } else {
+        Explorer explorer = (Explorer)oneOf(perceiveRobots(friend, EXPLORER));
+        if((int)random(100)>=95 && explorer != null && brain[2].z == 0){
+          becomeDaleks(explorer);
+        }
         if(!target()){
           // try to find a target
           selectTarget();
         }
         if (target() && goToTarget(brain[0])){
           // shoot on the target
-          Robot bob = (Robot)minDist(perceiveRobots(ennemy));
+          Robot bob;
+          if(brain[2].z == 0){
+            bob = (Robot)minDist(perceiveRobots(ennemy));
+          } else {
+            bob = (Robot)minDist(perceiveRobots(ennemy, HARVESTER));
+          }
+            
           if(bob != null){
             launchBullet(towards(bob));
           } else {
@@ -729,6 +835,43 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
     }
   }
 
+  Robot folowingOf(ArrayList<Robot> agentSet) {
+    // check that the list is not null and not of length 0
+    if ((agentSet != null) && (agentSet.size() != 0)) {
+      for(Robot robot : agentSet){
+        if (robot.who == brain[2].z){
+          // return the following agent
+          return robot;
+        }
+      }
+    }
+    // else return null
+    return null;
+  }
+
+  //
+  // becomeDaleks
+  // ===================
+  // > sends a BECOME_DALEKS message to another robot
+  //
+  // input
+  // -----
+  // > bob = the id (who) of the receiver
+  // > p = the position of the target
+  //
+  void becomeDaleks(Robot bob) {
+    // if bob exists and distance less than max range
+    if ((bob != null) && (distance(bob) < messageRange)) {
+      // build the message...
+      float[] args = new float[1];
+      args[0] = who;
+      Message msg = new Message(BECOME_DALEKS, who, bob.who, args);
+      // ...and add it to bob's messages queue
+      bob.messages.add(msg);
+    }
+  }
+
+
   boolean goToTarget(PVector t){
     if (distance(t)>detectionRange-3){
       heading = towards(t);
@@ -745,7 +888,12 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
   //
   void selectTarget() {
     // look for the closest ennemy robot
-    Robot bob = (Robot)minDist(perceiveRobots(ennemy));
+    Robot bob;
+    if (brain[2].z == 0){
+      bob = (Robot)minDist(perceiveRobots(ennemy));
+    } else {
+      bob = (Robot)minDist(perceiveRobots(ennemy, HARVESTER));
+    }
     if (bob != null) {
       // if one found, record the position and breed of the target
       brain[0].x = bob.pos.x;
@@ -845,6 +993,10 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         p.x = msg.args[0];
         p.y = msg.args[1];
         if (distance(p) < d) {
+          if (brain[2].z != 0 && msg.args[2] != HARVESTER){
+            println("THAT'S NOT THE DOCTOR");
+            break;
+          }
           // if burger closer than closest burger
           // record the position in the brain
           brain[0].x = p.x;
@@ -854,11 +1006,15 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
           // update the corresponding flag
           brain[4].y = 1;
         }
-      }
-      if (msg.type == INFORM_ABOUT_XYTARGET){
+      } else if (msg.type == INFORM_ABOUT_XYTARGET && brain[2].z == 0){
         brain[1].x = msg.args[0];
         brain[1].y = msg.args[1];
         brain[1].z = 1;
+      } else if (msg.type == BECOME_DALEKS && brain[2].z == 0){
+        brain[2].z = msg.args[0];
+        println("Exterminate!" + brain[2].z);
+      } else if (msg.type == GO_HOME && brain[2].z != 0){
+        brain[4].x = 1;
       }
     }
     // clear the message queue
