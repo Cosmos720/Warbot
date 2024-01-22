@@ -114,7 +114,7 @@ class RedBase extends Base implements RedRobot {
     // creates new bullets and fafs if the stock is low and enought energy
     if ((bullets < 10) && (energy > 1000))
       newBullets(50);
-    if ((fafs < 10) && (energy > 1000))
+    if ((fafs < 10) && (energy > 5000))
       newFafs(10);
 
     // if ennemy rocket launcher in the area of perception
@@ -131,13 +131,6 @@ class RedBase extends Base implements RedRobot {
       if (rocket != null){
         informAboutXYTarget(rocket, brain[1]);
       }
-    }
-  }
-
-  void forgetEnnemyBase() {
-    if(brain[4].z == 1 && brain[1].z+5000 <= game.ticks){
-      brain[1]=new PVector();
-      brain[4].z = 0;
     }
   }
 
@@ -247,7 +240,7 @@ class RedExplorer extends Explorer implements RedRobot {
       driveHarvesters();
       // inform rocket launchers about targets
       driveRocketLaunchers();
-      // forget ennemy base after 150 ticks
+      // forget ennemy base after 1000 ticks
       forgetEnnemyBase();
 
       if (brain[4].z == 1){
@@ -297,7 +290,7 @@ class RedExplorer extends Explorer implements RedRobot {
     }
   }
 
-Robot folowingOf(ArrayList<Robot> agentSet) {
+  Robot folowingOf(ArrayList<Robot> agentSet) {
     // check that the list is not null and not of length 0
     if ((agentSet != null) && (agentSet.size() != 0)) {
       for(Robot robot : agentSet){
@@ -773,7 +766,6 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
     if (brain[2].z != 0){
       Explorer explorer = (Explorer)folowingOf(perceiveRobots(friend, EXPLORER));
       if (explorer == null){
-        println("My Explorer" + brain[2].z + "is DEAD");
         brain[2].z = 0;
       }
     }
@@ -805,12 +797,7 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         }
         if (target() && goToTarget(brain[0])){
           // shoot on the target
-          Robot bob;
-          if(brain[2].z == 0){
-            bob = (Robot)minDist(perceiveRobots(ennemy));
-          } else {
-            bob = (Robot)minDist(perceiveRobots(ennemy, HARVESTER));
-          }
+          Robot bob = (brain[2].z == 0) ? (Robot)minDist(perceiveRobots(ennemy)) : (Robot)minDist(perceiveRobots(ennemy, HARVESTER));
             
           if(bob != null){
             launchBullet(towards(bob));
@@ -994,7 +981,6 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         p.y = msg.args[1];
         if (distance(p) < d) {
           if (brain[2].z != 0 && msg.args[2] != HARVESTER){
-            println("THAT'S NOT THE DOCTOR");
             break;
           }
           // if burger closer than closest burger
@@ -1012,7 +998,6 @@ class RedRocketLauncher extends RocketLauncher implements RedRobot {
         brain[1].z = 1;
       } else if (msg.type == BECOME_DALEKS && brain[2].z == 0){
         brain[2].z = msg.args[0];
-        println("Exterminate!" + brain[2].z);
       } else if (msg.type == GO_HOME && brain[2].z != 0){
         brain[4].x = 1;
       }
